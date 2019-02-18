@@ -90,6 +90,8 @@ namespace RegTool
                 var list = fields.Where(f => usages.Any(u => u.Name == f.Name)).ToList();
                 
                 WriteRegFieldLine(writer, "#define VDPU_SWREG(nr)", "((nr) * 4)");
+                writer.WriteLine();
+
                 foreach (var field in fields.Where(_ => _.IsBase && (_.Name == "RLC_VLC_BASE" || _.Name == "DEC_OUT_BASE")))
                     WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}", $"VDPU_SWREG({field.Reg})");
                 foreach (var field in list.Where(_ => _.IsBase))
@@ -103,7 +105,10 @@ namespace RegTool
                     foreach (var field in group.OrderByDescending(_ => _.Start))
                         WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}(v)", field.ToFieldValue());
                     writer.WriteLine();
+                }
 
+                foreach (var group in list.Where(_ => !_.IsBase).GroupBy(_ => $"VDPU_SWREG({_.Reg})"))
+                {
                     var values = group.OrderByDescending(_ => _.Start).Select(_ => $"VDPU_REG_{_.Name}({dictionary[_.Name].Value})").ToList();
                     writer.WriteLine($"\treg = {string.Join($" |{Environment.NewLine}\t      ", values)};");
                     writer.WriteLine($"\tvdpu_write_relaxed(vpu, reg, {group.Key});");
