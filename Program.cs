@@ -28,7 +28,7 @@ namespace RegTool
                     Console.WriteLine($"WARNING: VPU1 Field is not defined '{field.Name}'");
             }
 
-            var codecs = new string[] { "mpeg2" };
+            var codecs = new string[] { "mpeg2", "h264" };
             foreach (var codec in codecs)
             {
                 var vpu2FieldsFiltered = codec == "h264" ? 
