@@ -93,8 +93,8 @@
 	      VDPU_REG_DEC_AXI_WR_ID(0);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(3));
 
-	reg = VDPU_REG_PIC_MB_WIDTH(DIV_ROUND_UP(sequence->horizontal_size, 16)) |
-	      VDPU_REG_PIC_MB_HEIGHT_P(DIV_ROUND_UP(sequence->vertical_size, 16)) |
+	reg = VDPU_REG_PIC_MB_WIDTH(MPEG2_MB_WIDTH(ctx->dst_fmt.width)) |
+	      VDPU_REG_PIC_MB_HEIGHT_P(MPEG2_MB_HEIGHT(ctx->dst_fmt.height)) |
 	      VDPU_REG_ALT_SCAN_E(picture->alternate_scan) |
 	      VDPU_REG_TOPFIELDFIRST_E(picture->top_field_first);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(4));
@@ -127,7 +127,7 @@
 	reg = VDPU_REG_APF_THRESHOLD(8);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(55));
 
-	vdpu_write_relaxed(vpu, ctx->qtable_dma_addr, VDPU_REG_QTABLE_BASE);
+	vdpu_write_relaxed(vpu, ctx->mpeg2_dec.qtable.dma, VDPU_REG_QTABLE_BASE);
 
 	/* Source bitstream buffer */
 	addr = vb2_dma_contig_plane_dma_addr(&src_buf->vb2_buf, 0);
