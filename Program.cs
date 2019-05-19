@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using NaturalSort.Extension;
 
 namespace RegTool
 {
@@ -115,7 +116,7 @@ namespace RegTool
                     writer.WriteLine();
                 }
 
-                foreach (var field in list.Where(_ => _.IsBase && !_.IsRefer).OrderBy(_ => _.Name))
+                foreach (var field in list.Where(_ => _.IsBase && !_.IsRefer).OrderBy(_ => _.Name, StringComparer.OrdinalIgnoreCase.WithNaturalSort()))
                 {
                     writer.WriteLine($"\tvdpu_write_relaxed(vpu, {dictionary[field.Name].Value}, VDPU_REG_{field.Name});");
                     writer.WriteLine();
@@ -131,7 +132,7 @@ namespace RegTool
                 writer.WriteLine("\tvdpu_write_relaxed(vpu, addr, VDPU_REG_DEC_OUT_BASE);");
                 writer.WriteLine();
 
-                foreach (var field in list.Where(_ => _.IsRefer).OrderBy(_ => _.Name))
+                foreach (var field in list.Where(_ => _.IsRefer).OrderBy(_ => _.Name, StringComparer.OrdinalIgnoreCase.WithNaturalSort()))
                 {
                     writer.WriteLine($"\tvdpu_write_relaxed(vpu, {dictionary[field.Name].Value}, VDPU_REG_{field.Name});");
                 }
