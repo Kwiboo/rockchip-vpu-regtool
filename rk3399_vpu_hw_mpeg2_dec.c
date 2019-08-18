@@ -66,6 +66,11 @@
 #define VDPU_REG_MV_ACCURACY_FWD(v)	((v) ? BIT(2) : 0)
 #define VDPU_REG_MV_ACCURACY_BWD(v)	((v) ? BIT(1) : 0)
 
+	src_buf = hantro_get_src_buf(ctx);
+	dst_buf = hantro_get_dst_buf(ctx);
+
+	hantro_prepare_run(ctx);
+
 	reg = VDPU_REG_DEC_ADV_PRE_DIS(0) |
 	      VDPU_REG_DEC_SCMD_DIS(0) |
 	      VDPU_REG_FILTERING_DIS(1) |
@@ -147,3 +152,8 @@
 	vdpu_write_relaxed(vpu, forward_addr, VDPU_REG_REFER1_BASE);
 	vdpu_write_relaxed(vpu, backward_addr, VDPU_REG_REFER2_BASE);
 	vdpu_write_relaxed(vpu, backward_addr, VDPU_REG_REFER3_BASE);
+
+	hantro_finish_run(ctx);
+
+	reg = vdpu_read(vpu, VDPU_SWREG(57)) | VDPU_REG_DEC_E(1);
+	vdpu_write(vpu, reg, VDPU_SWREG(57));

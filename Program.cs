@@ -39,8 +39,8 @@ namespace RegTool
                 var vpu1Usages = GetRegUsage($"{codec}.txt", vpu1Fields);
                 var vpu2Usages = GetRegUsage($"{codec}.txt", vpu2FieldsFiltered);
 
-                GenerateRegUsage(vpu1Fields, vpu1Usages, $"rk3288_vpu_hw_{codec}_dec");
-                GenerateRegUsage(vpu2FieldsFiltered, vpu2Usages, $"rk3399_vpu_hw_{codec}_dec");
+                GenerateRegUsage(vpu1Fields, vpu1Usages, $"hantro_g1_{codec}_dec", "G1");
+                GenerateRegUsage(vpu2FieldsFiltered, vpu2Usages, $"rk3399_vpu_hw_{codec}_dec", "VDPU");
             }
         }
 
@@ -83,34 +83,41 @@ namespace RegTool
             writer.WriteLine($"{field}{separator}{value}");
         }
 
-        static void GenerateRegUsage(List<RegField> fields, List<RegUsage> usages, string filename)
+        static void GenerateRegUsage(List<RegField> fields, List<RegUsage> usages, string filename, string prefix)
         {
             using (var writer = File.CreateText($"{filename}.c"))
             {
                 var dictionary = usages.ToDictionary(_ => _.Name);
                 var list = fields.Where(f => usages.Any(u => u.Name == f.Name)).ToList();
                 
-                WriteRegFieldLine(writer, "#define VDPU_SWREG(nr)", "((nr) * 4)");
+                WriteRegFieldLine(writer, $"#define {prefix}_SWREG(nr)", "((nr) * 4)");
                 writer.WriteLine();
 
                 foreach (var field in fields.Where(_ => _.IsBase && (_.Name == "RLC_VLC_BASE" || _.Name == "DEC_OUT_BASE")))
-                    WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}", $"VDPU_SWREG({field.Reg})");
+                    WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}", $"{prefix}_SWREG({field.Reg})");
                 foreach (var field in list.Where(_ => _.IsBase))
-                    WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}", $"VDPU_SWREG({field.Reg})");
+                    WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}", $"{prefix}_SWREG({field.Reg})");
                 foreach (var field in fields.Where(_ => _.Name == "DEC_E"))
-                    WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}(v)", field.ToFieldValue());
+                    WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}(v)", field.ToFieldValue());
                 writer.WriteLine();
 
-                foreach (var group in list.Where(_ => !_.IsBase).GroupBy(_ => $"VDPU_SWREG({_.Reg})"))
+                foreach (var group in list.Where(_ => !_.IsBase).GroupBy(_ => $"{prefix}_SWREG({_.Reg})"))
                 {
                     foreach (var field in group.OrderByDescending(_ => _.Start))
-                        WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}(v)", field.ToFieldValue());
+                        WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}(v)", field.ToFieldValue());
                     writer.WriteLine();
                 }
+                
+                writer.WriteLine("\tsrc_buf = hantro_get_src_buf(ctx);");
+                writer.WriteLine("\tdst_buf = hantro_get_dst_buf(ctx);");
+                writer.WriteLine();
+                
+                writer.WriteLine("\thantro_prepare_run(ctx);");
+                writer.WriteLine();
 
-                foreach (var group in list.Where(_ => !_.IsBase).GroupBy(_ => $"VDPU_SWREG({_.Reg})"))
+                foreach (var group in list.Where(_ => !_.IsBase).GroupBy(_ => $"{prefix}_SWREG({_.Reg})"))
                 {
-                    var values = group.OrderByDescending(_ => _.Start).Select(_ => $"VDPU_REG_{_.Name}({dictionary[_.Name].Value})").ToList();
+                    var values = group.OrderByDescending(_ => _.Start).Select(_ => $"{prefix}_REG_{_.Name}({dictionary[_.Name].Value})").ToList();
                     writer.WriteLine($"\treg = {string.Join($" |{Environment.NewLine}\t      ", values)};");
                     writer.WriteLine($"\tvdpu_write_relaxed(vpu, reg, {group.Key});");
                     writer.WriteLine();
@@ -118,24 +125,39 @@ namespace RegTool
 
                 foreach (var field in list.Where(_ => _.IsBase && !_.IsRefer).OrderBy(_ => _.Name, StringComparer.OrdinalIgnoreCase.WithNaturalSort()))
                 {
-                    writer.WriteLine($"\tvdpu_write_relaxed(vpu, {dictionary[field.Name].Value}, VDPU_REG_{field.Name});");
+                    writer.WriteLine($"\tvdpu_write_relaxed(vpu, {dictionary[field.Name].Value}, {prefix}_REG_{field.Name});");
                     writer.WriteLine();
                 }
 
                 writer.WriteLine("\t/* Source bitstream buffer */");
                 writer.WriteLine("\taddr = vb2_dma_contig_plane_dma_addr(&src_buf->vb2_buf, 0);");
-                writer.WriteLine("\tvdpu_write_relaxed(vpu, addr, VDPU_REG_RLC_VLC_BASE);");
+                writer.WriteLine($"\tvdpu_write_relaxed(vpu, addr, {prefix}_REG_RLC_VLC_BASE);");
                 writer.WriteLine();
 
                 writer.WriteLine("\t/* Destination frame buffer */");
                 writer.WriteLine("\taddr = vb2_dma_contig_plane_dma_addr(&dst_buf->vb2_buf, 0);");
-                writer.WriteLine("\tvdpu_write_relaxed(vpu, addr, VDPU_REG_DEC_OUT_BASE);");
+                writer.WriteLine($"\tvdpu_write_relaxed(vpu, addr, {prefix}_REG_DEC_OUT_BASE);");
                 writer.WriteLine();
 
                 foreach (var field in list.Where(_ => _.IsRefer).OrderBy(_ => _.Name, StringComparer.OrdinalIgnoreCase.WithNaturalSort()))
                 {
-                    writer.WriteLine($"\tvdpu_write_relaxed(vpu, {dictionary[field.Name].Value}, VDPU_REG_{field.Name});");
+                    writer.WriteLine($"\tvdpu_write_relaxed(vpu, {dictionary[field.Name].Value}, {prefix}_REG_{field.Name});");
                 }
+                
+                writer.WriteLine();
+                writer.WriteLine("\thantro_finish_run(ctx);");
+                writer.WriteLine();
+                
+                var trigger = fields.Single(_ => _.Name == "DEC_E");
+                if (prefix == "G1")
+                {
+                    writer.WriteLine($"\treg = {prefix}_REG_DEC_E(1);");
+                }
+                else if (prefix == "VDPU")
+                {
+                    writer.WriteLine($"\treg = vdpu_read(vpu, {prefix}_SWREG({trigger.Reg})) | VDPU_REG_DEC_E(1);");
+                }
+                writer.WriteLine($"\tvdpu_write(vpu, reg, {prefix}_SWREG({trigger.Reg}));");
             }
         }
 

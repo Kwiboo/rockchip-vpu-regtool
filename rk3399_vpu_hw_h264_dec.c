@@ -185,6 +185,11 @@
 #define VDPU_REG_TYPE1_QUANT_E(v)	((v) ? BIT(1) : 0)
 #define VDPU_REG_FIELDPIC_FLAG_E(v)	((v) ? BIT(0) : 0)
 
+	src_buf = hantro_get_src_buf(ctx);
+	dst_buf = hantro_get_dst_buf(ctx);
+
+	hantro_prepare_run(ctx);
+
 	reg = VDPU_REG_DEC_ADV_PRE_DIS(0) |
 	      VDPU_REG_DEC_SCMD_DIS(0) |
 	      VDPU_REG_FILTERING_DIS(0) |
@@ -197,8 +202,8 @@
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(51));
 
 	reg = VDPU_REG_APF_THRESHOLD(8) |
-	      VDPU_REG_STARTMB_X(slice->first_mb_in_slice % H264_MB_WIDTH(ctx->dst_fmt.width)) |
-	      VDPU_REG_STARTMB_Y(slice->first_mb_in_slice / H264_MB_WIDTH(ctx->dst_fmt.width));
+	      VDPU_REG_STARTMB_X(0) |
+	      VDPU_REG_STARTMB_Y(0);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(52));
 
 	reg = VDPU_REG_DEC_MODE(0);
@@ -221,9 +226,9 @@
 	reg = VDPU_REG_START_CODE_E(1) |
 	      VDPU_REG_CH_8PIX_ILEAV_E(0) |
 	      VDPU_REG_RLC_MODE_E(0) |
-	      VDPU_REG_PIC_INTERLACE_E(!(sps->flags & V4L2_H264_SPS_FLAG_FRAME_MBS_ONLY) && (sps->flags & V4L2_H264_SPS_FLAG_MB_ADAPTIVE_FRAME_FIELD || slice->flags & V4L2_H264_SLICE_FLAG_FIELD_PIC)) |
-	      VDPU_REG_PIC_FIELDMODE_E(slice->flags & V4L2_H264_SLICE_FLAG_FIELD_PIC) |
-	      VDPU_REG_PIC_TOPFIELD_E(!(slice->flags & V4L2_H264_SLICE_FLAG_BOTTOM_FIELD)) |
+	      VDPU_REG_PIC_INTERLACE_E(!(sps->flags & V4L2_H264_SPS_FLAG_FRAME_MBS_ONLY) && (sps->flags & V4L2_H264_SPS_FLAG_MB_ADAPTIVE_FRAME_FIELD || slices[0].flags & V4L2_H264_SLICE_FLAG_FIELD_PIC)) |
+	      VDPU_REG_PIC_FIELDMODE_E(slices[0].flags & V4L2_H264_SLICE_FLAG_FIELD_PIC) |
+	      VDPU_REG_PIC_TOPFIELD_E(!(slices[0].flags & V4L2_H264_SLICE_FLAG_BOTTOM_FIELD)) |
 	      VDPU_REG_WRITE_MVS_E(dec_param->nal_ref_idc) |
 	      VDPU_REG_SEQ_MBAFF_E(sps->flags & V4L2_H264_SPS_FLAG_MB_ADAPTIVE_FRAME_FIELD) |
 	      VDPU_REG_PICORD_COUNT_E(1) |
@@ -255,36 +260,36 @@
 	      VDPU_REG_PINIT_RLIST_F10(p_reflist[10]);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(75));
 
-	reg = VDPU_REG_REFER1_NBR(get_dpb_nbr(dec_param, 1)) |
-	      VDPU_REG_REFER0_NBR(get_dpb_nbr(dec_param, 0));
+	reg = VDPU_REG_REFER1_NBR(hantro_h264_get_ref_nbr(ctx, 1)) |
+	      VDPU_REG_REFER0_NBR(hantro_h264_get_ref_nbr(ctx, 0));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(76));
 
-	reg = VDPU_REG_REFER3_NBR(get_dpb_nbr(dec_param, 3)) |
-	      VDPU_REG_REFER2_NBR(get_dpb_nbr(dec_param, 2));
+	reg = VDPU_REG_REFER3_NBR(hantro_h264_get_ref_nbr(ctx, 3)) |
+	      VDPU_REG_REFER2_NBR(hantro_h264_get_ref_nbr(ctx, 2));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(77));
 
-	reg = VDPU_REG_REFER5_NBR(get_dpb_nbr(dec_param, 5)) |
-	      VDPU_REG_REFER4_NBR(get_dpb_nbr(dec_param, 4));
+	reg = VDPU_REG_REFER5_NBR(hantro_h264_get_ref_nbr(ctx, 5)) |
+	      VDPU_REG_REFER4_NBR(hantro_h264_get_ref_nbr(ctx, 4));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(78));
 
-	reg = VDPU_REG_REFER7_NBR(get_dpb_nbr(dec_param, 7)) |
-	      VDPU_REG_REFER6_NBR(get_dpb_nbr(dec_param, 6));
+	reg = VDPU_REG_REFER7_NBR(hantro_h264_get_ref_nbr(ctx, 7)) |
+	      VDPU_REG_REFER6_NBR(hantro_h264_get_ref_nbr(ctx, 6));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(79));
 
-	reg = VDPU_REG_REFER9_NBR(get_dpb_nbr(dec_param, 9)) |
-	      VDPU_REG_REFER8_NBR(get_dpb_nbr(dec_param, 8));
+	reg = VDPU_REG_REFER9_NBR(hantro_h264_get_ref_nbr(ctx, 9)) |
+	      VDPU_REG_REFER8_NBR(hantro_h264_get_ref_nbr(ctx, 8));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(80));
 
-	reg = VDPU_REG_REFER11_NBR(get_dpb_nbr(dec_param, 11)) |
-	      VDPU_REG_REFER10_NBR(get_dpb_nbr(dec_param, 10));
+	reg = VDPU_REG_REFER11_NBR(hantro_h264_get_ref_nbr(ctx, 11)) |
+	      VDPU_REG_REFER10_NBR(hantro_h264_get_ref_nbr(ctx, 10));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(81));
 
-	reg = VDPU_REG_REFER13_NBR(get_dpb_nbr(dec_param, 13)) |
-	      VDPU_REG_REFER12_NBR(get_dpb_nbr(dec_param, 12));
+	reg = VDPU_REG_REFER13_NBR(hantro_h264_get_ref_nbr(ctx, 13)) |
+	      VDPU_REG_REFER12_NBR(hantro_h264_get_ref_nbr(ctx, 12));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(82));
 
-	reg = VDPU_REG_REFER15_NBR(get_dpb_nbr(dec_param, 15)) |
-	      VDPU_REG_REFER14_NBR(get_dpb_nbr(dec_param, 14));
+	reg = VDPU_REG_REFER15_NBR(hantro_h264_get_ref_nbr(ctx, 15)) |
+	      VDPU_REG_REFER14_NBR(hantro_h264_get_ref_nbr(ctx, 14));
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(83));
 
 	reg = VDPU_REG_BINIT_RLIST_F5(b0_reflist[5]) |
@@ -359,17 +364,17 @@
 	reg = VDPU_REG_FILT_CTRL_PRES(pps->flags & V4L2_H264_PPS_FLAG_DEBLOCKING_FILTER_CONTROL_PRESENT) |
 	      VDPU_REG_RDPIC_CNT_PRES(pps->flags & V4L2_H264_PPS_FLAG_REDUNDANT_PIC_CNT_PRESENT) |
 	      VDPU_REG_FRAMENUM_LEN(sps->log2_max_frame_num_minus4 + 4) |
-	      VDPU_REG_FRAMENUM(slice->frame_num);
+	      VDPU_REG_FRAMENUM(slices[0].frame_num);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(112));
 
-	reg = VDPU_REG_REFPIC_MK_LEN(slice->dec_ref_pic_marking_bit_size) |
-	      VDPU_REG_IDR_PIC_ID(slice->idr_pic_id);
+	reg = VDPU_REG_REFPIC_MK_LEN(slices[0].dec_ref_pic_marking_bit_size) |
+	      VDPU_REG_IDR_PIC_ID(slices[0].idr_pic_id);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(113));
 
-	reg = VDPU_REG_PPS_ID(slice->pic_parameter_set_id) |
+	reg = VDPU_REG_PPS_ID(slices[0].pic_parameter_set_id) |
 	      VDPU_REG_REFIDX1_ACTIVE(pps->num_ref_idx_l1_default_active_minus1 + 1) |
 	      VDPU_REG_REFIDX0_ACTIVE(pps->num_ref_idx_l0_default_active_minus1 + 1) |
-	      VDPU_REG_POC_LENGTH(slice->pic_order_cnt_bit_size);
+	      VDPU_REG_POC_LENGTH(slices[0].pic_order_cnt_bit_size);
 	vdpu_write_relaxed(vpu, reg, VDPU_SWREG(114));
 
 	reg = VDPU_REG_IDR_PIC_E(dec_param->flags & V4L2_H264_DECODE_PARAM_FLAG_IDR_PIC) |
@@ -395,19 +400,24 @@
 	addr = vb2_dma_contig_plane_dma_addr(&dst_buf->vb2_buf, 0);
 	vdpu_write_relaxed(vpu, addr, VDPU_REG_DEC_OUT_BASE);
 
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 0), VDPU_REG_REFER0_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 1), VDPU_REG_REFER1_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 2), VDPU_REG_REFER2_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 3), VDPU_REG_REFER3_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 4), VDPU_REG_REFER4_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 5), VDPU_REG_REFER5_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 6), VDPU_REG_REFER6_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 7), VDPU_REG_REFER7_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 8), VDPU_REG_REFER8_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 9), VDPU_REG_REFER9_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 10), VDPU_REG_REFER10_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 11), VDPU_REG_REFER11_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 12), VDPU_REG_REFER12_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 13), VDPU_REG_REFER13_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 14), VDPU_REG_REFER14_BASE);
-	vdpu_write_relaxed(vpu, get_dpb_addr(ctx, dec_param, 15), VDPU_REG_REFER15_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 0), VDPU_REG_REFER0_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 1), VDPU_REG_REFER1_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 2), VDPU_REG_REFER2_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 3), VDPU_REG_REFER3_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 4), VDPU_REG_REFER4_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 5), VDPU_REG_REFER5_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 6), VDPU_REG_REFER6_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 7), VDPU_REG_REFER7_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 8), VDPU_REG_REFER8_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 9), VDPU_REG_REFER9_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 10), VDPU_REG_REFER10_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 11), VDPU_REG_REFER11_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 12), VDPU_REG_REFER12_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 13), VDPU_REG_REFER13_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 14), VDPU_REG_REFER14_BASE);
+	vdpu_write_relaxed(vpu, hantro_h264_get_ref_dma_addr(ctx, 15), VDPU_REG_REFER15_BASE);
+
+	hantro_finish_run(ctx);
+
+	reg = vdpu_read(vpu, VDPU_SWREG(57)) | VDPU_REG_DEC_E(1);
+	vdpu_write(vpu, reg, VDPU_SWREG(57));
