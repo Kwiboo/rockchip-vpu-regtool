@@ -14,8 +14,8 @@ namespace RegTool
             var vpu1Fields = GetRegFields("vpu1hwtable.h");
             var vpu2Fields = GetRegFields("vpu2hwtable.h");
 
-            //GenerateRegHeader(vpu1Fields, "rk3288_vpu_hw_regs");
-            //GenerateRegHeader(vpu2Fields, "rk3399_vpu_hw_regs");
+            GenerateRegHeader(vpu1Fields, "hantro_g1_regs", "G1");
+            GenerateRegHeader(vpu2Fields, "rk3399_vpu_hw_regs", "VDPU");
 
             foreach (var field in vpu1Fields)
             {
@@ -44,11 +44,11 @@ namespace RegTool
             }
         }
 
-        static void GenerateRegHeader(List<RegField> fields, string filename)
+        static void GenerateRegHeader(List<RegField> fields, string filename, string prefix)
         {
             using (var writer = File.CreateText($"{filename}.h"))
             {
-                writer.WriteLine("#define VDPU_SWREG(nr)\t((nr) * 4)");
+                writer.WriteLine($"#define {prefix}_SWREG(nr)\t((nr) * 4)");
                 writer.WriteLine();
 
                 foreach (var group in fields.GroupBy(_ => _.Reg))
@@ -56,13 +56,13 @@ namespace RegTool
                     writer.WriteLine($"/* SWREG{group.Key} */");
 
                     foreach (var field in group.Where(_ => _.IsBase))
-                        WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}", $"VDPU_SWREG({field.Reg})");
+                        WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}", $"{prefix}_SWREG({field.Reg})");
 
                     foreach (var field in group.Where(_ => _.IsMask))
-                        WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}", field.ToField());
+                        WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}", field.ToField());
 
                     foreach (var field in group.Where(_ => !_.IsBase && !_.IsMask))
-                        WriteRegFieldLine(writer, $"#define VDPU_REG_{field.Name}(v)", field.ToFieldValue());
+                        WriteRegFieldLine(writer, $"#define {prefix}_REG_{field.Name}(v)", field.ToFieldValue());
 
                     writer.WriteLine();
                 }
